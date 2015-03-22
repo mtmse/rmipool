@@ -1,8 +1,9 @@
 package se.mtm.rmi.pool.api;
 
-public interface TaskProcess {
+import java.io.Closeable;
+
+public interface TaskProcess extends Closeable {
 	
 	public long getCreationTime();
-	public String process(String input);
 
 }

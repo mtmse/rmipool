@@ -5,79 +5,67 @@ import java.util.Vector;
 
 import se.mtm.rmi.pool.api.PoolRemote;
 import se.mtm.rmi.pool.api.TaskProcess;
-import se.mtm.rmi.pool.api.TaskProcessCreator;
 
-public class PoolServerProcess implements PoolRemote {
+public abstract class PoolServerProcess<T extends TaskProcess> implements PoolRemote {
 	private int count = 0;
 	private boolean stop = false;
-	private final TaskProcessCreator creator;
-	private final int maxProcesses;
-	private final int ageLimit;
-	private final int backoffTime;
-	private Vector<TaskProcess> threads;
+	private int maxProcesses = 1;
+	private int ageLimit = -1;
+	private int serverAgeLimit = -1;
+	private int backoffTime = 1000;
+	private Vector<T> threads;
 	
-	public static class Builder {
-		private final TaskProcessCreator creator;
-		private final int processes;
-		private int ageLimit = -1;
-		private int backoffTime = 1000;
-		public Builder(TaskProcessCreator creator, int processes) {
-			this.creator = creator;
-			this.processes = processes;
-		}
-		
-		/**
-		 * Sets the age limit for an instance
-		 * @param value the value in milliseconds
-		 * @return returns the builder
-		 */
-		public Builder ageLimit(int value) {
-			this.ageLimit = value;
-			return this;
-		}
-		
-		public Builder backoffTime(int value) {
-			this.backoffTime = value;
-			return this;
-		}
-		
-		public PoolServerProcess build() {
-			return new PoolServerProcess(this);
-		}
+	public PoolServerProcess() {
+		this.threads = new Vector<T>();
 	}
 	
-	private PoolServerProcess(Builder builder) {
-		this.threads = new Vector<TaskProcess>(builder.processes);
-		this.maxProcesses = builder.processes;
-		this.creator = builder.creator;
-		this.ageLimit = builder.ageLimit;
-		this.backoffTime = builder.backoffTime;
+	public int getMaxProcesses() {
+		return maxProcesses;
 	}
 
-	@Override
-	public String process(String args) throws RemoteException {
-		System.err.println("Process: " + args);
-		TaskProcess t = getProcess();
-		String ret = t.process(args);
-		releaseProcess(t);
-		return ret;
+	public void setMaxProcesses(int maxProcesses) {
+		this.maxProcesses = maxProcesses;
 	}
-	
-	private TaskProcess getProcess() {
+
+	public int getAgeLimit() {
+		return ageLimit;
+	}
+
+	public void setAgeLimit(int ageLimit) {
+		this.ageLimit = ageLimit;
+	}
+
+	public int getServerAgeLimit() {
+		return serverAgeLimit;
+	}
+
+	public void setServerAgeLimit(int serverAgeLimit) {
+		this.serverAgeLimit = serverAgeLimit;
+	}
+
+	public int getBackoffTime() {
+		return backoffTime;
+	}
+
+	public void setBackoffTime(int backoffTime) {
+		this.backoffTime = backoffTime;
+	}
+
+	protected T getProcess() {
 		while (true) {
 			if (threads.size()>0 || count < maxProcesses) {
 				synchronized (threads) {
 					if (threads.size()>0) {
 						count ++;
-						TaskProcess ret = threads.remove(0);
+						T ret = threads.remove(0);
 						if (ageLimit>=0 && System.currentTimeMillis()-ret.getCreationTime()>ageLimit) {
 							System.out.println("Discarding instance due to old age.");
-							ret = creator.newInstance();
+							ret = newInstance();
 						}
 						return ret;
 					} else if (count < maxProcesses) {
 						count ++;
-						return creator.newInstance();
+						return newInstance();
 					}
 				}
 			} else {
@@ -93,7 +81,11 @@ public class PoolServerProcess implements PoolRemote {
 		}
 	}
 	
-	private void releaseProcess(TaskProcess t) {
+	protected abstract T newInstance();
+	
+	public abstract String getServiceName();
+
+	protected void releaseProcess(T t) {
 		synchronized (threads) {
 			threads.add(t);
 		}
@@ -124,4 +116,5 @@ public class PoolServerProcess implements PoolRemote {
 	public void stop() throws RemoteException {
 		stop = true;
 	}
+
 }

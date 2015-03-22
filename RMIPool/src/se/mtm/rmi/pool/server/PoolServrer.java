@@ -5,77 +5,54 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
-import java.rmi.server.UnicastRemoteObject;
 import java.util.InvalidPropertiesFormatException;
 import java.util.Properties;
 
-import se.mtm.rmi.pool.api.PoolRemote;
-import se.mtm.rmi.pool.api.TaskProcessCreator;
+import se.mtm.rmi.pool.example.ExamplePoolServerProcess;
 
 public class PoolServrer {
-	public final static String PROP_CREATOR = "creator";
+	public final static String PROP_IMPLEMENTATION = "implementation";
 	public final static String PROP_MAX_INSTANCES = "max-instances";
 	public final static String PROP_AGE_LIMIT = "age-limit";
 	public final static String PROP_BACKOFF_TIME = "backoff-time";
 	
 	public static void main(String[] args) throws RemoteException, ClassNotFoundException, InstantiationException, IllegalAccessException {
-		if (args.length>0 && args[0].equals("stop")) {
-			stopInstance(PoolRemote.SERVICE_NAME);
-			System.exit(0);
+		if (args.length>=2 && args[0].equals("stop")) {
+			Properties p = getProperties(new File(args[1]));
+			Class<?> c = Class.forName(p.getProperty(PROP_IMPLEMENTATION));
+			Object impl = c.newInstance();
+			if (impl instanceof PoolServerProcess) {
+				PoolServerProcess<?> task = (PoolServerProcess<?>)impl;
+				PoolServerManager.stopService(task.getServiceName());
+			}
 		} else if (args.length>=2 && args[0].equals("start")) {
 			try {
 				Properties p = getProperties(new File(args[1]));
 				System.out.println("Starting server... ");
-				Class<?> c = Class.forName(p.getProperty(PROP_CREATOR));
-				Object processCreator = c.newInstance();
-				if (processCreator instanceof TaskProcessCreator) {
+				Class<?> c = Class.forName(p.getProperty(PROP_IMPLEMENTATION));
+				Object impl = c.newInstance();
+				if (impl instanceof PoolServerProcess) {
 					int count = Integer.parseInt(p.getProperty(PROP_MAX_INSTANCES));
-					PoolServerProcess task = new PoolServerProcess.
-							Builder(new ExampleTaskProcessCreator(), count).
-							ageLimit(Integer.parseInt(p.getProperty(PROP_AGE_LIMIT))).
-							backoffTime(Integer.parseInt(p.getProperty(PROP_BACKOFF_TIME))).
-							build();
-					startServer(task, PoolRemote.SERVICE_NAME);
-					while (task.alive()) {
-						try {
-							Thread.sleep(1000);
-						} catch (InterruptedException e) {
-							e.printStackTrace();
-						}
-					}
+					PoolServerProcess<?> task = (PoolServerProcess<?>)impl;
+					task.setMaxProcesses(count);
+					task.setAgeLimit(Integer.parseInt(p.getProperty(PROP_AGE_LIMIT)));
+					task.setBackoffTime(Integer.parseInt(p.getProperty(PROP_BACKOFF_TIME)));
+					PoolServerManager manager = new PoolServerManager(task);
+					manager.startServer(task.getServiceName());
+					manager.waitFor();
 					System.out.println("Stopping server...");
+					manager.stopServer(task.getServiceName());
 				} else {
-					System.out.println("Instance is not an implementation of TaskProcessCreator: " + processCreator.getClass().getCanonicalName());
+					System.out.println("Instance is not an implementation of PoolServerProcess: " + impl.getClass().getCanonicalName());
 				}
 			} finally {
-				System.exit(0);
+				//System.exit(0);
 			}
 		} else {
 			System.out.println("Usage: <command> [args]");
 			System.out.println("\tstart path_to_settings");
-			System.out.println("\tstop");
-		}
-	}
-	
-	private static void startServer(PoolRemote remote, String name) throws RemoteException {
-		PoolRemote stub = (PoolRemote)UnicastRemoteObject.exportObject(remote, 0);
-		Registry registry = LocateRegistry.createRegistry(PoolRemote.SERVICE_PORT);
-		registry.rebind(name, stub);
-	}
-	
-	private static void stopInstance(String name) {
-        try {
-    		Registry registry = LocateRegistry.getRegistry(PoolRemote.SERVICE_PORT);
-			PoolRemote server = (PoolRemote) registry.lookup(name);
-			server.stop();
-		} catch (NotBoundException e) {
-			e.printStackTrace();
-		} catch (RemoteException e) {
-			e.printStackTrace();
+			System.out.println("\tstop path_to_settings");
 		}
 	}
 	
@@ -83,7 +60,7 @@ public class PoolServrer {
 		Properties p = new Properties();
 		if (!f.exists()) {
 			try {
-				p.put(PROP_CREATOR, TaskProcessCreator.class.getCanonicalName());
+				p.put(PROP_IMPLEMENTATION, ExamplePoolServerProcess.class.getCanonicalName());
 				p.put(PROP_MAX_INSTANCES, "2");
 				p.put(PROP_AGE_LIMIT, ""+(1000*60*60));
 				p.put(PROP_BACKOFF_TIME, "1000");

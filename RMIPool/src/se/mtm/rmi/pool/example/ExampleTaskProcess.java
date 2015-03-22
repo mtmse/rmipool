@@ -1,4 +1,4 @@
-package se.mtm.rmi.pool.server;
+package se.mtm.rmi.pool.example;
 
 import se.mtm.rmi.pool.api.TaskProcess;
 
@@ -22,5 +22,14 @@ class ExampleTaskProcess implements TaskProcess {
 	@Override
 	public long getCreationTime() {
 		return creationTime;
+	}
+
+	@Override
+	public void close() {
+	}
+	
+	protected void finalize() throws Throwable {
+		close();
+		super.finalize();
 	}
 }

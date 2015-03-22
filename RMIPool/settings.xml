@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
+<properties>
+<comment>Default template</comment>
+<entry key="max-instances">2</entry>
+<entry key="backoff-time">1000</entry>
+<entry key="age-limit">3600000</entry>
+<entry key="creator">se.mtm.rmi.pool.server.ExampleTaskProcessCreator</entry>
+</properties>

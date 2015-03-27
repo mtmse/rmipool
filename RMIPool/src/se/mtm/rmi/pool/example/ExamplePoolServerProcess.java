@@ -1,6 +1,7 @@
 package se.mtm.rmi.pool.example;
 
 import java.rmi.RemoteException;
+import java.util.logging.Logger;
 
 import se.mtm.rmi.pool.server.PoolServerProcess;
 
@@ -8,11 +9,18 @@ public class ExamplePoolServerProcess extends PoolServerProcess<ExampleTaskProce
 	
 	@Override
 	public String process(String args) throws RemoteException {
-		System.err.println("Process: " + args);
-		ExampleTaskProcess t = getProcess();
-		String ret = t.process(args);
-		releaseProcess(t);
-		return ret;
+		Logger.getLogger(this.getClass().getCanonicalName()).fine("Process: " + args);
+		ExampleTaskProcess t = null;
+		try {
+			t = getProcess();
+			String ret = t.process(args);
+			Logger.getLogger(this.getClass().getCanonicalName()).fine("Return: " + ret);
+			return ret;
+		} finally {
+			if (t!=null) {
+				releaseProcess(t);
+			}
+		}
 	}
 	
 	@Override

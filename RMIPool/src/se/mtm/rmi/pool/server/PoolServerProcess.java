@@ -2,6 +2,7 @@ package se.mtm.rmi.pool.server;
 
 import java.rmi.RemoteException;
 import java.util.Vector;
+import java.util.logging.Logger;
 
 import se.mtm.rmi.pool.api.PoolRemote;
 import se.mtm.rmi.pool.api.TaskProcess;
@@ -12,11 +13,12 @@ public abstract class PoolServerProcess<T extends TaskProcess> implements PoolRe
 	private int maxProcesses = 1;
 	private int ageLimit = -1;
 	private int serverAgeLimit = -1;
-	private int backoffTime = 1000;
 	private Vector<T> threads;
+	private Vector<Object> waiting;
 	
 	public PoolServerProcess() {
 		this.threads = new Vector<T>();
+		this.waiting = new Vector<Object>();
 	}
 	
 	public int getMaxProcesses() {
@@ -43,14 +45,6 @@ public abstract class PoolServerProcess<T extends TaskProcess> implements PoolRe
 		this.serverAgeLimit = serverAgeLimit;
 	}
 
-	public int getBackoffTime() {
-		return backoffTime;
-	}
-
-	public void setBackoffTime(int backoffTime) {
-		this.backoffTime = backoffTime;
-	}
-
 	protected T getProcess() {
 		while (true) {
 			if (threads.size()>0 || count < maxProcesses) {
@@ -59,7 +53,7 @@ public abstract class PoolServerProcess<T extends TaskProcess> implements PoolRe
 						count ++;
 						T ret = threads.remove(0);
 						if (ageLimit>=0 && System.currentTimeMillis()-ret.getCreationTime()>ageLimit) {
-							System.out.println("Discarding instance due to old age.");
+							Logger.getLogger(this.getClass().getCanonicalName()).fine("Discarding instance due to old age.");
 							ret = newInstance();
 						}
 						return ret;
@@ -70,10 +64,10 @@ public abstract class PoolServerProcess<T extends TaskProcess> implements PoolRe
 				}
 			} else {
 				try {
-					//Sleep for backoffTime-backoffTime*2 ms
-					int sleep = (int)(Math.random()*backoffTime)+backoffTime;
-					System.err.println("Waiting for thread: " + sleep);
-					Thread.sleep(sleep);
+					waiting.add(this);
+					synchronized (this) {
+						wait();
+					}
 				} catch (InterruptedException e) {
 					e.printStackTrace();
 				}
@@ -90,6 +84,14 @@ public abstract class PoolServerProcess<T extends TaskProcess> implements PoolRe
 			threads.add(t);
 		}
 		count--;
+		synchronized (waiting) {
+			if (waiting.size()>0) {
+				Object o = waiting.remove(0);
+				synchronized (o) {
+					o.notify();
+				}
+			}
+		}
 	}
 	
 	public boolean alive() {
@@ -106,7 +108,7 @@ public abstract class PoolServerProcess<T extends TaskProcess> implements PoolRe
 				TaskProcess t = threads.elementAt(i);
 				if (ageLimit>=0 && System.currentTimeMillis()-t.getCreationTime()>ageLimit) {
 					threads.remove(0);
-					System.out.println("Discarding: " + threads.size());
+					Logger.getLogger(this.getClass().getCanonicalName()).fine("Discarding: " + threads.size());
 				}
 			}
 		}

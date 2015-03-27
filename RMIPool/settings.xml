@@ -3,7 +3,6 @@
 <properties>
 <comment>Default template</comment>
 <entry key="max-instances">2</entry>
-<entry key="backoff-time">1000</entry>
-<entry key="age-limit">1000</entry>
+<entry key="age-limit">30000</entry>
 <entry key="implementation">se.mtm.rmi.pool.example.ExamplePoolServerProcess</entry>
 </properties>

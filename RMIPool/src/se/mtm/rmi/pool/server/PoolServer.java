@@ -12,7 +12,7 @@ import java.util.logging.Logger;
 
 import se.mtm.rmi.pool.example.ExamplePoolServerProcess;
 
-public class PoolServrer {
+public class PoolServer {
 	public final static String PROP_IMPLEMENTATION = "implementation";
 	public final static String PROP_MAX_INSTANCES = "max-instances";
 	public final static String PROP_AGE_LIMIT = "age-limit";
@@ -29,7 +29,7 @@ public class PoolServrer {
 		} else if (args.length>=2 && args[0].equals("start")) {
 			try {
 				Properties p = getProperties(new File(args[1]));
-				Logger.getLogger(PoolServrer.class.getCanonicalName()).info("Starting server... ");
+				Logger.getLogger(PoolServer.class.getCanonicalName()).info("Starting server... ");
 				Class<?> c = Class.forName(p.getProperty(PROP_IMPLEMENTATION));
 				Object impl = c.newInstance();
 				if (impl instanceof PoolServerProcess) {
@@ -40,10 +40,10 @@ public class PoolServrer {
 					PoolServerManager manager = new PoolServerManager(task);
 					manager.startServer(task.getServiceName());
 					manager.waitFor();
-					Logger.getLogger(PoolServrer.class.getCanonicalName()).info("Stopping server...");
+					Logger.getLogger(PoolServer.class.getCanonicalName()).info("Stopping server...");
 					manager.stopServer(task.getServiceName());
 				} else {
-					Logger.getLogger(PoolServrer.class.getCanonicalName()).severe("Instance is not an implementation of PoolServerProcess: " + impl.getClass().getCanonicalName());
+					Logger.getLogger(PoolServer.class.getCanonicalName()).severe("Instance is not an implementation of PoolServerProcess: " + impl.getClass().getCanonicalName());
 				}
 			} finally {
 				//System.exit(0);
